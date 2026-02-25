@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Task Combustivel B</title>
+    <link rel="stylesheet" href="/tasks/shared.css" />
+    <style>
+      .fuel-area {
+        border-color: #3f4f78;
+        background:
+          radial-gradient(circle at 18% 16%, rgba(56, 189, 248, 0.14), transparent 34%),
+          radial-gradient(circle at 84% 84%, rgba(245, 158, 11, 0.1), transparent 36%),
+          linear-gradient(180deg, #0a1221 0%, #0a111c 100%);
+        display: grid;
+        place-items: center;
+        padding: clamp(12px, 3vw, 18px);
+      }
+
+      .tank {
+        width: min(190px, 44vw);
+        height: min(300px, 64vw);
+        min-height: 220px;
+        border-radius: 32px;
+        border: 4px solid #4b5563;
+        background: linear-gradient(180deg, #1f2937, #111827);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .tank-window {
+        position: absolute;
+        inset: 14px;
+        border-radius: 24px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(8, 12, 19, 0.9);
+      }
+
+      .fuel-liquid {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 100%;
+        background: linear-gradient(180deg, #38bdf8 0%, #2563eb 45%, #0f172a 100%);
+        box-shadow: 0 0 30px rgba(56, 189, 248, 0.35);
+        transition: height 0.1s linear;
+      }
+
+      .bubble-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+      }
+
+      .bubble-layer.running {
+        opacity: 1;
+      }
+
+      .bubble {
+        position: absolute;
+        top: -16px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.3);
+        animation: drop var(--dur) linear infinite;
+        animation-delay: var(--delay);
+      }
+
+      @keyframes drop {
+        from {
+          transform: translateY(0) scale(0.55);
+          opacity: 0;
+        }
+        20% {
+          opacity: 0.9;
+        }
+        to {
+          transform: translateY(250px) scale(1.25);
+          opacity: 0;
+        }
+      }
+
+      .fuel-button {
+        margin-top: 2px;
+        width: min(240px, 86vw);
+        min-height: 74px;
+        border-radius: 999px;
+        border: 2px solid rgba(255, 255, 255, 0.12);
+        background: linear-gradient(180deg, #38bdf8, #0369a1);
+        color: #03131d;
+        font-size: 16px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .fuel-button:active {
+        transform: scale(0.98);
+      }
+
+      .fuel-button.holding {
+        box-shadow: 0 0 24px rgba(56, 189, 248, 0.55);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="task">
+      <div class="task-title">Combustivel B</div>
+      <div class="task-sub">Press and hold to unload fuel to 0%.</div>
+
+      <div class="hud-row">
+        <div>Fuel to unload</div>
+        <div><strong id="percent">100%</strong></div>
+      </div>
+
+      <div class="play-area fuel-area">
+        <div class="screen-grid"></div>
+        <div class="tank">
+          <div class="tank-window">
+            <div class="fuel-liquid" id="fuelLiquid"></div>
+            <div class="bubble-layer" id="bubbleLayer"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="progress-shell">
+        <div class="progress-fill" id="progressFill" style="background: linear-gradient(90deg, #38bdf8, #f59e0b);"></div>
+      </div>
+
+      <button id="holdBtn" class="fuel-button" type="button">Hold To Unload</button>
+      <div id="status" class="status">Keep holding until the tank is empty.</div>
+    </div>
+
+    <script>
+      const fuelLiquid = document.getElementById('fuelLiquid');
+      const bubbleLayer = document.getElementById('bubbleLayer');
+      const percentEl = document.getElementById('percent');
+      const progressFill = document.getElementById('progressFill');
+      const holdBtn = document.getElementById('holdBtn');
+      const statusEl = document.getElementById('status');
+
+      let progress = 100;
+      let holding = false;
+      let done = false;
+      let timer = null;
+      let completeSent = false;
+
+      function notifyComplete() {
+        if (completeSent) return;
+        completeSent = true;
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'TASK_COMPLETE', taskId: 'COMBUSTIVEL_B' }, window.location.origin);
+        }
+      }
+
+      function createBubbles() {
+        bubbleLayer.innerHTML = '';
+        for (let i = 0; i < 9; i += 1) {
+          const bubble = document.createElement('span');
+          bubble.className = 'bubble';
+          const size = Math.random() * 10 + 4;
+          bubble.style.width = `${size}px`;
+          bubble.style.height = `${size}px`;
+          bubble.style.left = `${Math.random() * 92}%`;
+          bubble.style.setProperty('--dur', `${(Math.random() * 1.5 + 1.1).toFixed(2)}s`);
+          bubble.style.setProperty('--delay', `${(Math.random() * 1.4).toFixed(2)}s`);
+          bubbleLayer.appendChild(bubble);
+        }
+      }
+
+      function updateUI() {
+        const pct = Math.round(progress);
+        percentEl.textContent = `${pct}%`;
+        fuelLiquid.style.height = `${pct}%`;
+        progressFill.style.width = `${pct}%`;
+
+        if (done) {
+          holdBtn.textContent = 'Delivered';
+          holdBtn.disabled = true;
+          holdBtn.classList.remove('holding');
+          bubbleLayer.classList.remove('running');
+          statusEl.textContent = 'Fuel delivered successfully.';
+          statusEl.className = 'status success';
+        } else {
+          holdBtn.classList.toggle('holding', holding);
+          bubbleLayer.classList.toggle('running', holding);
+          statusEl.textContent = holding ? 'Transfer valve open...' : 'Keep holding until the tank is empty.';
+          statusEl.className = 'status';
+        }
+      }
+
+      function step() {
+        if (!holding || done) return;
+        const speed = progress > 70 ? 0.95 : progress > 35 ? 1.2 : 1.45;
+        progress = Math.max(0, progress - speed);
+        updateUI();
+
+        if (progress <= 0) {
+          done = true;
+          holding = false;
+          updateUI();
+          notifyComplete();
+        }
+      }
+
+      function setHolding(value) {
+        if (done) return;
+        holding = value;
+        updateUI();
+      }
+
+      holdBtn.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        setHolding(true);
+      });
+      holdBtn.addEventListener('pointerup', () => setHolding(false));
+      holdBtn.addEventListener('pointerleave', () => setHolding(false));
+      holdBtn.addEventListener('pointercancel', () => setHolding(false));
+      window.addEventListener('pointerup', () => setHolding(false));
+      window.addEventListener('blur', () => setHolding(false));
+      holdBtn.addEventListener('contextmenu', (event) => event.preventDefault());
+
+      createBubbles();
+      updateUI();
+      timer = setInterval(step, 50);
+    </script>
+  </body>
+</html>

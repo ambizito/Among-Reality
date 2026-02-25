@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Task O2</title>
+    <link rel="stylesheet" href="/tasks/shared.css" />
+    <style>
+      .o2-area {
+        border-color: #2b5b44;
+        background:
+          radial-gradient(circle at 22% 16%, rgba(34, 197, 94, 0.11), transparent 34%),
+          radial-gradient(circle at 84% 85%, rgba(14, 116, 144, 0.1), transparent 35%),
+          linear-gradient(180deg, #08151f 0%, #08101a 100%);
+        display: grid;
+        grid-template-columns: 1fr 84px;
+        gap: 10px;
+        padding: 10px;
+      }
+
+      .filter-zone {
+        border-radius: 14px;
+        border: 1px solid #335874;
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.85), rgba(8, 14, 24, 0.85));
+        position: relative;
+        overflow: hidden;
+        touch-action: none;
+      }
+
+      .filter-zone::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.16;
+        background-image: radial-gradient(circle, #fff 1px, transparent 1.4px);
+        background-size: 22px 22px;
+      }
+
+      .chute {
+        border-radius: 14px;
+        border: 1px solid #2f6448;
+        background: linear-gradient(180deg, rgba(17, 38, 33, 0.85), rgba(11, 28, 24, 0.85));
+        position: relative;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+
+      .chute::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(34, 197, 94, 0.05), transparent 30%, rgba(34, 197, 94, 0.05));
+      }
+
+      .chute-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 999px;
+        border: 2px dashed rgba(34, 197, 94, 0.5);
+        display: grid;
+        place-items: center;
+        font-size: 21px;
+      }
+
+      .debris {
+        position: absolute;
+        width: clamp(36px, 8vw, 48px);
+        height: clamp(36px, 8vw, 48px);
+        border-radius: 999px;
+        border: 2px solid rgba(8, 18, 30, 0.8);
+        cursor: grab;
+        touch-action: none;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.35);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .debris[data-style='leaf'] {
+        background: radial-gradient(circle at 30% 30%, #34d399, #166534 68%);
+      }
+
+      .debris[data-style='dust'] {
+        background: radial-gradient(circle at 32% 32%, #f59e0b, #78350f 70%);
+      }
+
+      .debris.dragging {
+        cursor: grabbing;
+        transform: scale(1.1);
+        box-shadow: 0 0 16px rgba(34, 211, 238, 0.4);
+      }
+
+      .meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="task">
+      <div class="task-title">O2</div>
+      <div class="task-sub">Drag debris into the disposal chute.</div>
+
+      <div class="meta">
+        <div>Debris left: <strong id="leftCount">0</strong></div>
+        <div id="stateText">Filter clogged</div>
+      </div>
+
+      <div class="play-area o2-area" id="o2Area">
+        <div class="screen-grid"></div>
+        <div class="filter-zone" id="filterZone"></div>
+        <div class="chute" id="chute">
+          <div class="chute-icon">O2</div>
+        </div>
+      </div>
+
+      <div id="status" class="status">Move all debris to the chute.</div>
+    </div>
+
+    <script>
+      const filterZone = document.getElementById('filterZone');
+      const chute = document.getElementById('chute');
+      const leftCountEl = document.getElementById('leftCount');
+      const stateTextEl = document.getElementById('stateText');
+      const statusEl = document.getElementById('status');
+
+      const debrisCount = 8;
+      const debrisItems = [];
+
+      let dragging = null;
+      let completeSent = false;
+      let done = false;
+
+      function notifyComplete() {
+        if (completeSent) return;
+        completeSent = true;
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'TASK_COMPLETE', taskId: 'O2' }, window.location.origin);
+        }
+      }
+
+      function random(min, max) {
+        return min + Math.random() * (max - min);
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function updateCounters() {
+        const left = debrisItems.length;
+        leftCountEl.textContent = String(left);
+        if (left === 0) {
+          done = true;
+          stateTextEl.textContent = 'Filter clear';
+          statusEl.textContent = 'O2 stable. Task complete.';
+          statusEl.className = 'status success';
+          notifyComplete();
+        } else {
+          stateTextEl.textContent = left <= 2 ? 'Almost clean' : 'Filter clogged';
+        }
+      }
+
+      function positionDebris(item) {
+        item.el.style.transform = `translate(${item.x}px, ${item.y}px)`;
+      }
+
+      function removeDebris(item) {
+        item.el.remove();
+        const index = debrisItems.indexOf(item);
+        if (index >= 0) {
+          debrisItems.splice(index, 1);
+        }
+        updateCounters();
+      }
+
+      function isInsideChute(clientX, clientY) {
+        const rect = chute.getBoundingClientRect();
+        return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+      }
+
+      function buildDebris() {
+        const rect = filterZone.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+
+        for (let i = 0; i < debrisCount; i += 1) {
+          const item = {
+            id: `d_${i}`,
+            x: random(14, Math.max(16, width - 66)),
+            y: random(14, Math.max(16, height - 66)),
+            el: document.createElement('button'),
+          };
+
+          item.el.type = 'button';
+          item.el.className = 'debris';
+          item.el.dataset.style = i % 2 === 0 ? 'leaf' : 'dust';
+          positionDebris(item);
+
+          item.el.addEventListener('pointerdown', (event) => {
+            if (done) return;
+            event.preventDefault();
+
+            const zoneRect = filterZone.getBoundingClientRect();
+            const localX = event.clientX - zoneRect.left;
+            const localY = event.clientY - zoneRect.top;
+
+            dragging = {
+              item,
+              pointerId: event.pointerId,
+              offsetX: localX - item.x,
+              offsetY: localY - item.y,
+            };
+
+            item.el.classList.add('dragging');
+            item.el.setPointerCapture(event.pointerId);
+          });
+
+          debrisItems.push(item);
+          filterZone.appendChild(item.el);
+        }
+
+        updateCounters();
+      }
+
+      window.addEventListener('pointermove', (event) => {
+        if (!dragging || done) return;
+        if (event.pointerId !== dragging.pointerId) return;
+
+        const zoneRect = filterZone.getBoundingClientRect();
+        const width = zoneRect.width;
+        const height = zoneRect.height;
+        const item = dragging.item;
+
+        const nextX = clamp(event.clientX - zoneRect.left - dragging.offsetX, 0, width - item.el.offsetWidth);
+        const nextY = clamp(event.clientY - zoneRect.top - dragging.offsetY, 0, height - item.el.offsetHeight);
+
+        item.x = nextX;
+        item.y = nextY;
+        positionDebris(item);
+
+        const centerX = event.clientX;
+        const centerY = event.clientY;
+        if (isInsideChute(centerX, centerY)) {
+          item.el.classList.remove('dragging');
+          removeDebris(item);
+          dragging = null;
+        }
+      });
+
+      function endDrag(event) {
+        if (!dragging) return;
+        if (event && event.pointerId !== dragging.pointerId) return;
+        dragging.item.el.classList.remove('dragging');
+        dragging = null;
+      }
+
+      window.addEventListener('pointerup', endDrag);
+      window.addEventListener('pointercancel', endDrag);
+
+      function start() {
+        debrisItems.splice(0).forEach((item) => item.el.remove());
+        done = false;
+        completeSent = false;
+        statusEl.textContent = 'Move all debris to the chute.';
+        statusEl.className = 'status';
+        buildDebris();
+      }
+
+      start();
+    </script>
+  </body>
+</html>

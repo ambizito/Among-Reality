@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Task Armas</title>
+    <link rel="stylesheet" href="/tasks/shared.css" />
+    <style>
+      .space-field {
+        border-color: #1f6d63;
+        background:
+          radial-gradient(circle at 22% 18%, rgba(45, 212, 191, 0.12), transparent 36%),
+          radial-gradient(circle at 78% 85%, rgba(34, 211, 238, 0.1), transparent 34%),
+          linear-gradient(180deg, #040810 0%, #071321 100%);
+        cursor: crosshair;
+        touch-action: none;
+      }
+
+      .space-field::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          radial-gradient(circle, rgba(255, 255, 255, 0.9) 1px, transparent 1.8px),
+          radial-gradient(circle, rgba(255, 255, 255, 0.35) 1px, transparent 1.8px);
+        background-size: 32px 32px, 54px 54px;
+        background-position: 0 0, 9px 14px;
+        opacity: 0.25;
+        pointer-events: none;
+      }
+
+      .reticle {
+        position: absolute;
+        width: 72px;
+        height: 72px;
+        border: 2px solid rgba(45, 212, 191, 0.6);
+        border-radius: 999px;
+        pointer-events: none;
+        transform: translate(-50%, -50%);
+        transition: opacity 0.15s ease;
+        opacity: 0;
+      }
+
+      .reticle::before,
+      .reticle::after {
+        content: "";
+        position: absolute;
+        background: rgba(45, 212, 191, 0.5);
+      }
+
+      .reticle::before {
+        left: 50%;
+        top: -10px;
+        width: 2px;
+        height: 90px;
+        transform: translateX(-50%);
+      }
+
+      .reticle::after {
+        left: -10px;
+        top: 50%;
+        width: 90px;
+        height: 2px;
+        transform: translateY(-50%);
+      }
+
+      .asteroid {
+        position: absolute;
+        border-radius: 999px;
+        border: 2px solid rgba(3, 7, 18, 0.75);
+        background:
+          radial-gradient(circle at 30% 28%, #d1d5db 0%, #6b7280 48%, #374151 100%);
+        box-shadow:
+          inset -10px -10px 14px rgba(0, 0, 0, 0.38),
+          0 0 20px rgba(148, 163, 184, 0.2);
+        cursor: pointer;
+        touch-action: none;
+      }
+
+      .asteroid:active {
+        transform: scale(0.92);
+      }
+
+      .hit-flash {
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        border: 2px solid rgba(34, 211, 238, 0.85);
+        box-shadow: 0 0 18px rgba(34, 211, 238, 0.85);
+        pointer-events: none;
+        animation: burst 0.34s ease-out forwards;
+      }
+
+      @keyframes burst {
+        from {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(0.35);
+        }
+        to {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(2.8);
+        }
+      }
+
+      .meta {
+        margin-top: 2px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="task">
+      <div class="task-title">Armas</div>
+      <div class="task-sub">Destroy 20 asteroids before they pass.</div>
+
+      <div class="hud-row">
+        <div><strong id="score">0</strong>/20</div>
+        <div class="status" id="status">Target acquired</div>
+      </div>
+
+      <div class="play-area space-field" id="field">
+        <div class="screen-grid"></div>
+        <div class="reticle" id="reticle"></div>
+      </div>
+
+      <div class="meta" id="meta">Tap asteroids to destroy them.</div>
+    </div>
+
+    <script>
+      const field = document.getElementById('field');
+      const scoreEl = document.getElementById('score');
+      const statusEl = document.getElementById('status');
+      const metaEl = document.getElementById('meta');
+      const reticleEl = document.getElementById('reticle');
+
+      const targetScore = 20;
+      const maxAsteroids = 8;
+
+      let score = 0;
+      let asteroids = [];
+      let spawnTimer = null;
+      let animFrame = null;
+      let running = true;
+      let lastTime = 0;
+      let completeSent = false;
+
+      function notifyComplete() {
+        if (completeSent) return;
+        completeSent = true;
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'TASK_COMPLETE', taskId: 'ARMAS' }, window.location.origin);
+        }
+      }
+
+      function randomBetween(min, max) {
+        return min + Math.random() * (max - min);
+      }
+
+      function updateScore() {
+        scoreEl.textContent = String(score);
+      }
+
+      function createHitFlash(x, y) {
+        const flash = document.createElement('div');
+        flash.className = 'hit-flash';
+        flash.style.left = `${x}px`;
+        flash.style.top = `${y}px`;
+        field.appendChild(flash);
+        setTimeout(() => {
+          flash.remove();
+        }, 340);
+      }
+
+      function removeAsteroid(asteroid) {
+        asteroid.el.remove();
+        asteroids = asteroids.filter((item) => item !== asteroid);
+      }
+
+      function randomSpawnPoint(width, height, size) {
+        const edge = Math.floor(Math.random() * 4);
+        if (edge === 0) return { x: randomBetween(0, width), y: -size - 10 };
+        if (edge === 1) return { x: width + size + 10, y: randomBetween(0, height) };
+        if (edge === 2) return { x: randomBetween(0, width), y: height + size + 10 };
+        return { x: -size - 10, y: randomBetween(0, height) };
+      }
+
+      function spawnAsteroid() {
+        if (!running || score >= targetScore || asteroids.length >= maxAsteroids) return;
+
+        const width = field.clientWidth;
+        const height = field.clientHeight;
+        const size = randomBetween(Math.max(24, 40 - score * 0.4), Math.max(38, 64 - score * 0.55));
+
+        const spawn = randomSpawnPoint(width, height, size);
+        const targetX = width * randomBetween(0.24, 0.76) + randomBetween(-24, 24);
+        const targetY = height * randomBetween(0.22, 0.78) + randomBetween(-24, 24);
+
+        const dx = targetX - spawn.x;
+        const dy = targetY - spawn.y;
+        const distance = Math.hypot(dx, dy) || 1;
+
+        const speed = randomBetween(74, 132) + score * 3.2;
+        const asteroid = {
+          x: spawn.x,
+          y: spawn.y,
+          vx: (dx / distance) * speed,
+          vy: (dy / distance) * speed,
+          size,
+          rot: randomBetween(0, 360),
+          spinSpeed: randomBetween(-180, 180),
+          el: document.createElement('button'),
+        };
+
+        asteroid.el.className = 'asteroid';
+        asteroid.el.type = 'button';
+        asteroid.el.style.width = `${size}px`;
+        asteroid.el.style.height = `${size}px`;
+
+        asteroid.el.addEventListener('pointerdown', (event) => {
+          if (!running) return;
+          event.preventDefault();
+          createHitFlash(asteroid.x, asteroid.y);
+          removeAsteroid(asteroid);
+          score += 1;
+          updateScore();
+          statusEl.textContent = score >= targetScore ? 'Task complete' : 'Direct hit';
+          statusEl.className = score >= targetScore ? 'status success' : 'status';
+
+          if (score >= targetScore) {
+            running = false;
+            metaEl.textContent = 'All asteroids destroyed.';
+            clearTimeout(spawnTimer);
+            cancelAnimationFrame(animFrame);
+            notifyComplete();
+          }
+        });
+
+        field.appendChild(asteroid.el);
+        asteroids.push(asteroid);
+      }
+
+      function scheduleSpawn() {
+        if (!running) return;
+        spawnAsteroid();
+        const interval = Math.max(300, 930 - score * 23 + randomBetween(0, 120));
+        spawnTimer = setTimeout(scheduleSpawn, interval);
+      }
+
+      function moveAsteroids(timestamp) {
+        if (!running) return;
+
+        if (!lastTime) lastTime = timestamp;
+        const dt = Math.min(0.034, (timestamp - lastTime) / 1000);
+        lastTime = timestamp;
+
+        const width = field.clientWidth;
+        const height = field.clientHeight;
+
+        asteroids.forEach((asteroid) => {
+          asteroid.x += asteroid.vx * dt;
+          asteroid.y += asteroid.vy * dt;
+          asteroid.rot += asteroid.spinSpeed * dt;
+
+          asteroid.el.style.transform = `translate(${asteroid.x - asteroid.size / 2}px, ${asteroid.y - asteroid.size / 2}px) rotate(${asteroid.rot}deg)`;
+        });
+
+        asteroids = asteroids.filter((asteroid) => {
+          const margin = asteroid.size + 90;
+          const out = asteroid.x < -margin || asteroid.x > width + margin || asteroid.y < -margin || asteroid.y > height + margin;
+          if (out) {
+            asteroid.el.remove();
+            return false;
+          }
+          return true;
+        });
+
+        animFrame = requestAnimationFrame(moveAsteroids);
+      }
+
+      field.addEventListener('pointermove', (event) => {
+        const rect = field.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        reticleEl.style.left = `${x}px`;
+        reticleEl.style.top = `${y}px`;
+        reticleEl.style.opacity = '1';
+      });
+
+      field.addEventListener('pointerleave', () => {
+        reticleEl.style.opacity = '0';
+      });
+
+      function start() {
+        score = 0;
+        updateScore();
+        statusEl.textContent = 'Target acquired';
+        statusEl.className = 'status';
+        metaEl.textContent = 'Tap asteroids to destroy them.';
+        asteroids.forEach((asteroid) => asteroid.el.remove());
+        asteroids = [];
+        running = true;
+        completeSent = false;
+        lastTime = 0;
+        clearTimeout(spawnTimer);
+        cancelAnimationFrame(animFrame);
+        scheduleSpawn();
+        animFrame = requestAnimationFrame(moveAsteroids);
+      }
+
+      start();
+    </script>
+  </body>
+</html>

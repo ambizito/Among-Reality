@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Task Fiacao</title>
+    <link rel="stylesheet" href="/tasks/shared.css" />
+    <style>
+      .wire-board {
+        margin-top: 14px;
+        width: 100%;
+        height: 320px;
+        border-radius: 16px;
+        border: 1px solid #334155;
+        background: #0b1220;
+        position: relative;
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 20px;
+        touch-action: none;
+      }
+      .wire-col {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+        gap: 8px;
+        z-index: 2;
+      }
+      .wire-node {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        border: 4px solid #1f2937;
+        background: #111827;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        position: relative;
+      }
+      .wire-node.connected {
+        opacity: 0.6;
+        cursor: default;
+      }
+      .wire-node.selected {
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+      }
+      .wire-node .spark {
+        width: 100%;
+        height: 100%;
+        border-radius: 8px;
+        background: rgba(250, 204, 21, 0.18);
+        animation: spark 1.2s infinite;
+      }
+      @keyframes spark {
+        0%, 100% { opacity: 0.35; }
+        50% { opacity: 0.8; }
+      }
+      .wire-svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+        pointer-events: none;
+      }
+      .wire-hint {
+        margin-top: 10px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="task">
+      <div class="task-title">Fiacao</div>
+      <div class="task-sub">Connect matching colors.</div>
+      <div id="board" class="wire-board">
+        <svg id="wireSvg" class="wire-svg" aria-hidden="true"></svg>
+        <div id="leftCol" class="wire-col"></div>
+        <div id="rightCol" class="wire-col"></div>
+      </div>
+      <div id="status" class="status">0 / 4</div>
+      <div class="wire-hint">Drag from left to right.</div>
+    </div>
+
+    <script>
+      const colors = ['red', 'blue', '#FFE135', 'magenta'];
+      const board = document.getElementById('board');
+      const leftCol = document.getElementById('leftCol');
+      const rightCol = document.getElementById('rightCol');
+      const svg = document.getElementById('wireSvg');
+      const statusEl = document.getElementById('status');
+      const SVG_NS = 'http://www.w3.org/2000/svg';
+
+      let wires = { left: [], right: [] };
+      let connections = {};
+      let dragging = null;
+
+      function shuffle(list) {
+        const copy = [...list];
+        for (let i = copy.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+      }
+
+      function notifyComplete() {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'TASK_COMPLETE', taskId: 'FIOS' }, window.location.origin);
+        }
+      }
+
+      function rowHeight() {
+        return board.clientHeight / 4;
+      }
+
+      function updateStatus(message) {
+        if (message) {
+          statusEl.textContent = message;
+          return;
+        }
+        statusEl.textContent = `${Object.keys(connections).length} / 4`;
+      }
+
+      function clearSvgLines() {
+        while (svg.firstChild) {
+          svg.removeChild(svg.firstChild);
+        }
+      }
+
+      function renderConnections() {
+        clearSvgLines();
+        const h = rowHeight();
+        const width = board.clientWidth;
+        Object.keys(connections).forEach((color) => {
+          const leftIndex = wires.left.indexOf(color);
+          const rightIndex = wires.right.indexOf(color);
+          if (leftIndex < 0 || rightIndex < 0) return;
+          const line = document.createElementNS(SVG_NS, 'line');
+          line.setAttribute('x1', 40);
+          line.setAttribute('y1', leftIndex * h + h / 2);
+          line.setAttribute('x2', width - 40);
+          line.setAttribute('y2', rightIndex * h + h / 2);
+          line.setAttribute('stroke', color);
+          line.setAttribute('stroke-width', '15');
+          line.setAttribute('stroke-linecap', 'round');
+          svg.appendChild(line);
+        });
+      }
+
+      function setDraggingLine(point) {
+        if (!dragging) return;
+        dragging.line.setAttribute('x1', dragging.startX);
+        dragging.line.setAttribute('y1', dragging.startY);
+        dragging.line.setAttribute('x2', point.x);
+        dragging.line.setAttribute('y2', point.y);
+      }
+
+      function getPoint(event) {
+        const rect = board.getBoundingClientRect();
+        return {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        };
+      }
+
+      function handleStartDrag(color, index) {
+        if (connections[color]) return;
+        const h = rowHeight();
+        const line = document.createElementNS(SVG_NS, 'line');
+        line.setAttribute('stroke', color);
+        line.setAttribute('stroke-width', '15');
+        line.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(line);
+        dragging = {
+          color,
+          startX: 40,
+          startY: index * h + h / 2,
+          line,
+        };
+      }
+
+      function handleMove(event) {
+        if (!dragging) return;
+        setDraggingLine(getPoint(event));
+      }
+
+      function handleEndDrag(event) {
+        if (!dragging) return;
+        const point = getPoint(event);
+        const width = board.clientWidth;
+        const h = rowHeight();
+        if (point.x > width - 60) {
+          const indexRight = Math.floor(point.y / h);
+          if (indexRight >= 0 && indexRight < 4) {
+            const targetColor = wires.right[indexRight];
+            if (targetColor === dragging.color) {
+              connections[dragging.color] = true;
+            }
+          }
+        }
+        dragging.line.remove();
+        dragging = null;
+        renderConnections();
+        updateNodes();
+        updateStatus();
+        if (Object.keys(connections).length === 4) {
+          statusEl.classList.add('success');
+          statusEl.textContent = 'All wires connected!';
+          setTimeout(notifyComplete, 400);
+        }
+      }
+
+      function updateNodes() {
+        const leftNodes = leftCol.querySelectorAll('.wire-node');
+        leftNodes.forEach((node, index) => {
+          const color = wires.left[index];
+          const connected = Boolean(connections[color]);
+          node.style.borderColor = color;
+          node.style.backgroundColor = connected ? color : '#333';
+          node.classList.toggle('connected', connected);
+          node.innerHTML = connected ? '' : '<div class="spark"></div>';
+        });
+
+        const rightNodes = rightCol.querySelectorAll('.wire-node');
+        rightNodes.forEach((node, index) => {
+          const color = wires.right[index];
+          const connected = Boolean(connections[color]);
+          node.style.borderColor = color;
+          node.style.backgroundColor = connected ? color : '#333';
+          node.classList.toggle('connected', connected);
+        });
+      }
+
+      function init() {
+        wires = {
+          left: shuffle(colors),
+          right: shuffle(colors),
+        };
+        leftCol.innerHTML = '';
+        rightCol.innerHTML = '';
+
+        wires.left.forEach((color, index) => {
+          const node = document.createElement('div');
+          node.className = 'wire-node';
+          node.style.borderColor = color;
+          node.addEventListener('pointerdown', (event) => {
+            event.preventDefault();
+            handleStartDrag(color, index);
+          });
+          leftCol.appendChild(node);
+        });
+
+        wires.right.forEach(() => {
+          const node = document.createElement('div');
+          node.className = 'wire-node';
+          rightCol.appendChild(node);
+        });
+
+        updateNodes();
+        updateStatus();
+        renderConnections();
+      }
+
+      board.addEventListener('pointermove', handleMove);
+      window.addEventListener('pointerup', handleEndDrag);
+      window.addEventListener('pointercancel', handleEndDrag);
+      window.addEventListener('resize', renderConnections);
+
+      init();
+    </script>
+  </body>
+</html>

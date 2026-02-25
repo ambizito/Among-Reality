@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Task Escudo</title>
+    <link rel="stylesheet" href="/tasks/shared.css" />
+    <style>
+      .shield-area {
+        margin-top: 16px;
+        width: 260px;
+        height: 260px;
+        position: relative;
+      }
+      .shield {
+        position: absolute;
+        width: 64px;
+        height: 64px;
+        clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+        border: 2px solid #1f2937;
+        background: #ef4444;
+        box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+        cursor: pointer;
+        transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
+      }
+      .shield.fixed {
+        background: #f8fafc;
+        box-shadow: 0 0 10px rgba(248, 250, 252, 0.6);
+      }
+      .shield:hover {
+        transform: scale(1.05);
+      }
+      .shield-center {
+        position: absolute;
+        inset: 8px;
+        clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+        background: rgba(15, 23, 42, 0.15);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="task">
+      <div class="task-title">Escudo</div>
+      <div class="task-sub">Activate all shields.</div>
+      <div id="shieldArea" class="shield-area"></div>
+      <div id="status" class="status">0 / 7</div>
+    </div>
+
+    <script>
+      const shieldArea = document.getElementById('shieldArea');
+      const statusEl = document.getElementById('status');
+      const positions = [
+        { x: 98, y: 6 },
+        { x: 22, y: 52 },
+        { x: 174, y: 52 },
+        { x: 98, y: 98 },
+        { x: 22, y: 144 },
+        { x: 174, y: 144 },
+        { x: 98, y: 190 },
+      ];
+      let shields = [true, true, false, true, false, true, false];
+      let done = false;
+
+      function notifyComplete() {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'TASK_COMPLETE', taskId: 'ESCUDO' }, window.location.origin);
+        }
+      }
+
+      function updateStatus() {
+        const fixed = shields.filter((value) => !value).length;
+        statusEl.textContent = `${fixed} / ${shields.length}`;
+      }
+
+      function checkComplete() {
+        if (shields.every((value) => !value)) {
+          done = true;
+          statusEl.textContent = 'Shields online!';
+          statusEl.classList.add('success');
+          notifyComplete();
+        }
+      }
+
+      shields.forEach((damaged, index) => {
+        const shield = document.createElement('button');
+        shield.type = 'button';
+        shield.className = 'shield';
+        shield.style.left = `${positions[index].x}px`;
+        shield.style.top = `${positions[index].y}px`;
+        if (!damaged) shield.classList.add('fixed');
+
+        const inner = document.createElement('div');
+        inner.className = 'shield-center';
+        shield.appendChild(inner);
+
+        shield.addEventListener('click', () => {
+          if (done) return;
+          if (!shields[index]) return;
+          shields[index] = false;
+          shield.classList.add('fixed');
+          updateStatus();
+          checkComplete();
+        });
+
+        shieldArea.appendChild(shield);
+      });
+
+      updateStatus();
+    </script>
+  </body>
+</html>

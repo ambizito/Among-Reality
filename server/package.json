@@ -1,0 +1,15 @@
+{
+  "name": "among-reality-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servidor local do Among Reality",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "qrcode:generate": "node tools/generate-qrcodes.mjs"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  }
+}
