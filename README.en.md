@@ -1,121 +1,191 @@
-﻿# Among Reality: QR Ops
+# Among Reality: QR Ops
 
-Local multiplayer social deduction game inspired by Among Us, designed for casual play with friends, using QR codes to unlock physical stations and mobile-friendly minigames.
+Language:
 
-## Official Project Name
+- Portuguese (Brazil): [README.md](README.md) [default]
+- English
 
-- Name: `Among Reality: QR Ops`
-- Type: `Mobile Local Multiplayer Social Deduction Game`
-- Presentation stage: `Playable MVP`
+Local multiplayer social deduction game inspired by Among Us, built for casual play with friends, using QR codes to unlock physical station minigames and a server-authoritative rules engine.
 
 ## Author
 
 - Developed by: `André Azevedo Ferreira Carvalho`
 - LinkedIn: `https://www.linkedin.com/in/andreazevedoferreira/`
 
-## 1) Project Goals
+## Quick Overview
 
-- Run without Firebase and without authentication.
-- Keep game state in local server memory.
-- Support LAN (Wi-Fi) and external access via HTTPS tunnel.
-- Prioritize mobile gameplay (camera QR scan + touch minigames).
+| Item | Value |
+| --- | --- |
+| Status | Playable MVP |
+| Mode | Casual local multiplayer |
+| Stack | React + Vite + Node.js |
+| Source of truth | Local backend (`server/index.js`) |
+| Persistence | In-memory only (no database) |
+| Max players | 20 |
+| Mobile access | LAN and HTTPS tunnel (cloudflared) |
 
-## 2) Stack and Requirements
+## Quick Start
+
+### Option A: manual (2 terminals)
+
+1. Backend:
+
+```powershell
+cd server
+npm install
+npm run qrcode:generate
+npm start
+```
+
+2. Frontend:
+
+```powershell
+cd client
+npm install
+npm run dev
+```
+
+3. Open:
+
+```text
+http://localhost:5173
+```
+
+### Option B: one command + tunnel (recommended for mobile)
+
+```powershell
+./start-with-tunnel.cmd
+```
+
+This script:
+
+- starts backend;
+- starts frontend;
+- starts HTTPS tunnel to `http://localhost:5173`.
+
+## Visual Showcase (image and video slots)
+
+This section is pre-structured so you can add minigame screenshots and a demo video later.
+
+Expected files:
+
+- `docs/media/minigames/armas.png`
+- `docs/media/minigames/download.png`
+- `docs/media/minigames/o2.png`
+- `docs/media/minigames/comunicacao.png`
+- `docs/media/minigames/combustivel_a.png`
+- `docs/media/minigames/combustivel_b.png`
+- `docs/media/minigames/fios.png`
+- `docs/media/minigames/lixo.png`
+- `docs/media/minigames/navegacao.png`
+- `docs/media/minigames/escudo.png`
+- `docs/media/minigames/eletrica_ritmo.png`
+- `docs/media/video/demo-thumb.png`
+
+### Application video (placeholder)
+
+[![Watch demo](docs/media/video/demo-thumb.png)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
+
+When publishing your demo:
+
+1. Replace `YOUR_VIDEO_ID` with the real ID.
+2. Add the thumbnail to `docs/media/video/demo-thumb.png`.
+
+### Minigame gallery (ready placeholders)
+
+| Minigame | How it works | Image |
+| --- | --- | --- |
+| Armas | Tap asteroids until objective is complete. | ![Armas](docs/media/minigames/armas.png) |
+| Download | Start transfer and wait until 100%. | ![Download](docs/media/minigames/download.png) |
+| O2 | Drag debris to clear the filter. | ![O2](docs/media/minigames/o2.png) |
+| Comunicacao | Tune frequency/amplitude until stable lock. | ![Comunicacao](docs/media/minigames/comunicacao.png) |
+| Combustivel A | Hold to fill tank to 100%. | ![Combustivel A](docs/media/minigames/combustivel_a.png) |
+| Combustivel B | Hold to drain tank to 0%. | ![Combustivel B](docs/media/minigames/combustivel_b.png) |
+| Fios | Connect matching wire pairs. | ![Fios](docs/media/minigames/fios.png) |
+| Lixo | Execute cafeteria trash disposal. | ![Lixo](docs/media/minigames/lixo.png) |
+| Navegacao | Align route/navigation correctly. | ![Navegacao](docs/media/minigames/navegacao.png) |
+| Escudo | Activate shield sequence in panel. | ![Escudo](docs/media/minigames/escudo.png) |
+| Eletrica Ritmo | Complete rhythm timing correctly. | ![Eletrica Ritmo](docs/media/minigames/eletrica_ritmo.png) |
+
+## How gameplay works (flow)
+
+1. Player joins lobby (`JOIN`) with `playerId` persisted in `localStorage`.
+2. Host configures match and starts (`START`).
+3. `STARTING` role reveal screen appears.
+4. In `IN_GAME`, player scans task QR to unlock instance.
+5. Minigame opens in iframe.
+6. Minigame sends `TASK_COMPLETE` via `postMessage`.
+7. Client sends `COMPLETE_TASK_INSTANCE`.
+8. Meetings and voting follow backend rules.
+
+## Architecture
+
+```text
+Browser / Mobile
+   |
+   | GET /state (polling)
+   | POST /events (with eventId)
+   v
+server/index.js
+   +-- in-memory match state
+   +-- business rules (host, tasks, kill, sabotage, meetings, votes)
+
+client/src/App.jsx
+   +-- screen orchestration
+   +-- sync/scanner/actions hooks
+   +-- modular UI components
+   +-- HTML minigames in iframe
+```
+
+Principles:
+
+- Server-authoritative logic.
+- Event idempotency via `eventId`.
+- Login-free local session (`localStorage`).
+- Ephemeral state for fast casual gameplay.
+
+## Stack and Requirements
 
 ### Stack
 
 - Frontend: React 19 + Vite (`client/`)
-- Backend: Node.js HTTP server without framework (`server/index.js`)
-- Minigames: plain HTML/CSS/JS in `client/public/tasks`
-- QR codes: generated with `qrcode` on backend
+- Backend: Node.js HTTP server (`server/index.js`)
+- Minigames: plain HTML/CSS/JS (`client/public/tasks`)
+- QR codes: `qrcode` via `server/tools/generate-qrcodes.mjs`
 
-### Minimum Requirements
+### Minimum requirements
 
-- Node.js `>= 20.19.0` (recommended due to Vite 7)
+- Node.js `>= 20.19.0`
 - npm `>= 10`
-- Windows PowerShell (for ready-to-use tunnel script)
-- Optional: `cloudflared` for external HTTPS access
+- PowerShell (Windows)
+- Optional: `cloudflared` (HTTPS tunnel)
 
-Cloudflare Tunnel install (Windows):
+Install cloudflared:
 
 ```powershell
 winget install --id Cloudflare.cloudflared -e
 ```
 
-## 3) Architecture Overview
-
-```text
-Mobile/Browser
-   |
-   |  GET /state (1s polling)
-   |  POST /events (player actions with eventId)
-   v
-server/index.js  <-- single source of truth
-   |
-   +-- match.state: LOBBY -> STARTING -> IN_GAME
-   +-- players, roles, task instances, meeting, sabotage, corpses
-   +-- game rules + validations
-
-client/src/App.jsx
-   |
-   +-- hooks:
-   |   - useMatchSync (sync)
-   |   - useGameActions (event dispatch)
-   |   - useQrScanner (camera + decoding)
-   |
-   +-- reusable screens/modals/components
-   +-- minigames through iframe + TASK_COMPLETE postMessage
-```
-
-## 4) Methodology and Engineering Principles
-
-- Server-authoritative game logic: all critical rules are validated on backend.
-- Ephemeral state: restarting `server` resets the match.
-- Event idempotency: `eventId` prevents duplicated action effects.
-- Local session: `playerId` and nickname persist in `localStorage` (`pId`, `pNickname`).
-- Modular frontend: screens, hooks, and modals split for maintainability.
-
-## 5) Current Gameplay Rules (Summary)
-
-- Room limit: `20` players.
-- Host: first player who joins.
-- Match start in lobby:
-  - host only;
-  - minimum players depends on impostor count;
-  - ready check required for everyone except host.
-- Tasks:
-  - assigned by instance (`instanceId`);
-  - duplicates allowed;
-  - completed instance cannot be replayed;
-  - global progress counts only real crewmate tasks.
-- Impostor:
-  - `Kill` has individual cooldown per impostor.
-  - `Sabotage` has shared global cooldown for all impostors.
-- Report/Meeting:
-  - wrong report applies 10s cooldown for reporter;
-  - valid report starts meeting and shows round deaths;
-  - QR check-in (45s timeout), then voting (3min timeout), with `SKIP` and tie = no ejection.
-
-## 6) Main API
+## Main API
 
 ### `GET /state`
 
-Returns full match state (`match`).
+Returns full match state.
 
 ### `POST /events`
 
-Request envelope:
+Input:
 
 ```json
 {
-  "eventId": "uuid-or-unique-id",
-  "playerId": "client-persisted-id",
+  "eventId": "unique-id",
+  "playerId": "player-id",
   "type": "JOIN",
   "payload": {}
 }
 ```
 
-Response envelope:
+Output:
 
 ```json
 {
@@ -127,7 +197,7 @@ Response envelope:
 }
 ```
 
-Supported backend events:
+Supported events:
 
 - `JOIN`
 - `CHANGE_COLOR`
@@ -146,179 +216,85 @@ Supported backend events:
 - `CAST_VOTE`
 - `RESET_MATCH`
 
-## 7) Tasks and Minigames
+## Current game rules (summary)
 
-Current mapping (`taskType -> file`):
+- Up to 20 players.
+- First player becomes host.
+- Start requires readiness and minimum players.
+- Tasks use `instanceId` and allow duplicates.
+- Kill uses individual cooldown per impostor.
+- Sabotage uses shared global impostor cooldown.
+- Wrong report gives 10s report cooldown.
+- Meeting includes QR check-in, timed voting, and `SKIP`.
 
-- `lixo` -> `/tasks/lixo.html`
-- `o2` -> `/tasks/o2.html`
-- `fios` -> `/tasks/fios.html`
-- `download` -> `/tasks/download.html`
-- `comunicacao` -> `/tasks/comunicacao.html`
-- `armas` -> `/tasks/armas.html`
-- `navegacao` -> `/tasks/navegacao.html`
-- `escudo` -> `/tasks/escudo.html`
-- `combustivel_a` -> `/tasks/combustivel_a.html`
-- `combustivel_b` -> `/tasks/combustivel_b.html`
-- `eletrica_ritmo` -> `/tasks/eletrica_ritmo.html`
-
-Minigame completion contract (inside iframe):
-
-```js
-window.parent.postMessage(
-  { type: 'TASK_COMPLETE', taskId: 'LEGACY_TASK_ID' },
-  window.location.origin
-);
-```
-
-## 8) Folder Structure
+## Folder structure
 
 ```text
 among-reality/
   client/
-    public/tasks/           # minigame HTML/CSS/JS
+    public/tasks/
     src/
       screens/
       components/
       hooks/
       lib/
   server/
-    index.js                # game rules + API
-    config/taskCatalog.js   # task catalog + QR payloads
+    index.js
+    config/taskCatalog.js
     tools/generate-qrcodes.mjs
-    qrcodes/                # generated by script
+    qrcodes/
+  docs/
+    media/
+      minigames/
+      video/
   start-with-tunnel.ps1
   start-with-tunnel.cmd
 ```
 
-## 9) Run Guide (Step by Step)
-
-### Option A: Manual (2 terminals)
-
-1. Backend
-
-```powershell
-cd server
-npm install
-npm run qrcode:generate
-npm start
-```
-
-2. Frontend
-
-```powershell
-cd client
-npm install
-npm run dev
-```
-
-3. Open in desktop browser:
-
-```text
-http://localhost:5173
-```
-
-### Option B: Script + Tunnel (recommended for mobile)
-
-From project root:
-
-```powershell
-./start-with-tunnel.cmd
-```
-
-The script:
-
-- starts backend in a new terminal;
-- starts frontend in a new terminal;
-- launches `cloudflared` HTTPS tunnel for `http://localhost:5173`.
-
-Use the generated `https://...trycloudflare.com` URL on all devices.
-
-## 10) Network, Camera, and Wi-Fi/4G/5G Switching
-
-- Mobile camera access usually requires secure context (`https`) or `localhost`.
-- For QR scanning on mobile, prefer the tunnel URL.
-- To keep session while switching networks:
-  - always use tunnel URL;
-  - do not clear browser `localStorage`.
-
-## 11) Useful Commands
-
-Backend:
-
-```powershell
-cd server
-npm start
-npm run qrcode:generate
-node --check index.js
-```
-
-Frontend:
-
-```powershell
-cd client
-npm run dev
-npm run lint
-npm run build
-npm run preview
-```
-
-## 12) How to Add a New Task
+## How to add a new task
 
 1. Create minigame in `client/public/tasks/<name>.html`.
-2. Implement `TASK_COMPLETE` postMessage with correct `taskId`.
-3. Add task in `server/config/taskCatalog.js`.
-4. Add mapping in `client/src/lib/taskMappings.js`.
-5. Regenerate QRs:
+2. Implement `TASK_COMPLETE` postMessage with proper `taskId`.
+3. Register task in `server/config/taskCatalog.js`.
+4. Register mapping in `client/src/lib/taskMappings.js`.
+5. Run:
 
 ```powershell
 cd server
 npm run qrcode:generate
 ```
 
-6. Validate full flow: scan -> unlock -> play -> complete -> `COMPLETED` state.
+6. Validate full flow: scan -> unlock -> minigame -> complete.
 
-## 13) Quick Troubleshooting
+## Quick troubleshooting
 
-- Mobile cannot open app:
-  - ensure frontend is running on `5173`;
-  - if using LAN IP, check Windows firewall and same Wi-Fi;
-  - for camera/network reliability, use HTTPS tunnel.
-- QR scanned but task does not open:
-  - verify task was assigned to player;
+- Mobile cannot access:
+  - ensure frontend runs on `5173`;
+  - check firewall and same LAN if using IP;
+  - for camera support, prefer HTTPS tunnel.
+- QR scans but task does not open:
+  - verify task assignment;
   - verify instance is not already completed;
-  - verify `taskType` in `taskCatalog.js` and `taskMappings.js`.
-- Player disconnected and returned:
-  - reuse same browser/device to keep `pId` in `localStorage`.
+  - verify `taskType` in catalog and mapping.
+- Reconnect:
+  - use same browser/device to keep `pId`.
 
-## 14) Known Limitations
+## Recruiter and discovery tags
 
-- No database persistence.
-- No advanced multi-room architecture (single local match).
-- No authentication.
-- No advanced anti-cheat.
+### GitHub Topics
 
-## 15) Recruiter and Discovery Tags
+`react`, `vite`, `javascript`, `nodejs`, `html5`, `css3`, `polling`, `realtime`, `multiplayer`, `mobile-first`, `qrcode`, `social-deduction`, `party-game`, `game-dev`, `frontend-architecture`, `backend-architecture`, `server-authoritative`, `event-driven`
 
-Use these tags in GitHub topics, LinkedIn posts, and portfolio descriptions.
+### Technical keywords
 
-### Suggested GitHub Topics
+`react-hooks`, `modular-frontend`, `state-synchronization`, `http-api`, `idempotency`, `event-id-deduplication`, `in-memory-state`, `single-source-of-truth`, `localstorage-session`, `qr-task-unlock`, `iframe-minigames`, `postmessage-integration`, `cooldown-system`, `role-based-gameplay`, `meeting-flow`, `voting-system`, `game-state-machine`, `host-controls`, `ready-check`, `impostor-mechanics`, `cloudflare-tunnel`, `network-switch-resilience`, `touch-optimized-ui`, `responsive-minigames`, `fullstack-javascript`
 
-`react`, `vite`, `javascript`, `nodejs`, `html5`, `css3`, `websocket-alternative`, `polling`, `realtime`, `multiplayer`, `mobile-first`, `pwa-ready`, `qrcode`, `social-deduction`, `party-game`, `game-dev`, `frontend-architecture`, `backend-architecture`, `server-authoritative`, `event-driven`
+### Technical decisions for interviews
 
-### Technical Keywords (SEO/portfolio/recruiters)
-
-`react-hooks`, `component-driven-ui`, `modular-frontend`, `clean-architecture`, `state-synchronization`, `http-api`, `rest-like-api`, `idempotency`, `event-id-deduplication`, `in-memory-state`, `single-source-of-truth`, `local-first`, `offline-tolerant-session`, `localstorage-session`, `qr-task-unlock`, `iframe-minigames`, `postmessage-integration`, `cooldown-system`, `role-based-gameplay`, `meeting-flow`, `voting-system`, `game-state-machine`, `lobby-system`, `host-controls`, `ready-check`, `impostor-mechanics`, `kill-cooldown`, `shared-sabotage-cooldown`, `report-validation`, `checkin-qr`, `mobile-camera-access`, `cloudflare-tunnel`, `network-switch-resilience`, `android-friendly-ui`, `ios-friendly-ui`, `touch-optimized-ui`, `responsive-minigames`, `javascript-gameplay`, `node-http-server`, `no-firebase`, `no-auth`, `casual-gaming-platform`, `rapid-prototyping`, `product-engineering`, `fullstack-javascript`
-
-### Technical Decisions to Highlight in Interviews
-
-- `Server-authoritative game logic` to avoid client inconsistency.
-- `Idempotency via eventId` to tolerate duplicate requests.
-- `In-memory state` for low-latency casual gameplay.
-- `playerId in localStorage` for reconnect without login.
-- `Task instances` to support duplicated tasks without conflict.
-- `Global and individual cooldown model` for impostor balancing.
-- `Minigame integration via iframe + postMessage` for decoupling.
-- `Vite proxy + unified API` to simplify local development.
-- `HTTPS tunnel` for mobile camera support outside LAN.
+- Server-authoritative game logic.
+- Idempotency via `eventId`.
+- Login-free session using `localStorage`.
+- Task instances for duplicates.
+- Individual kill cooldown + global sabotage cooldown.
+- Decoupled minigame integration using iframe.
 

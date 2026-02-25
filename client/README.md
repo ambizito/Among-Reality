@@ -4,8 +4,8 @@ Este diretorio contem o frontend React/Vite do jogo.
 
 Documentacao principal do projeto:
 
-- `../README.md` (seletor de idioma)
-- `../README.pt-BR.md` (portugues)
+- `../README.md` (portugues, padrao)
+- `../README.pt-BR.md` (portugues, copia dedicada)
 - `../README.en.md` (english)
 
 Comandos rapidos:
