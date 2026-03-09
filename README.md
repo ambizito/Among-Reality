@@ -62,6 +62,35 @@ Esse script:
 - sobe backend;
 - sobe frontend;
 - abre tunnel HTTPS para `http://localhost:5173`.
+- detecta automaticamente a URL `https://...trycloudflare.com`;
+- gera um QR Code dessa URL em `%TEMP%\\among-reality-tunnel-qr.png`;
+- abre o QR automaticamente no visualizador padrao do Windows.
+
+### Erro de host bloqueado no tunnel
+
+Se aparecer:
+
+```text
+Blocked request. This host ("...trycloudflare.com") is not allowed.
+```
+
+A causa e o `server.allowedHosts` do Vite bloqueando o dominio externo.
+Este projeto ja permite `.trycloudflare.com` por padrao em `client/vite.config.js`.
+
+Notas importantes para acesso externo:
+
+- a URL `https://...trycloudflare.com` e temporaria e muda a cada execucao do tunnel;
+- o QR do tunnel tambem e regenerado a cada execucao (porque a URL muda);
+- para jogar em outra internet, todos os usuarios devem abrir exatamente essa URL HTTPS;
+- `localhost` e `127.0.0.1` funcionam apenas na maquina host;
+- se o QR nao abrir automaticamente, use a URL impressa no terminal;
+- se precisar liberar outros dominios, use `VITE_EXTRA_ALLOWED_HOSTS` (CSV), por exemplo:
+
+```powershell
+cd client
+$env:VITE_EXTRA_ALLOWED_HOSTS="meu-dominio.ngrok-free.app,meuapp.exemplo.com"
+npm run dev
+```
 
 ## Demonstracao Visual (imagens e video)
 
@@ -297,4 +326,3 @@ npm run qrcode:generate
 - Instancias de task para suportar duplicatas.
 - Cooldown individual (kill) + global (sabotagem).
 - Integracao desacoplada de minigames via iframe.
-
