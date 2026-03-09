@@ -11,6 +11,7 @@ import TaskModal from './components/modals/TaskModal';
 import MeetingOverlay from './components/modals/MeetingOverlay';
 import SettingsModal from './components/modals/SettingsModal';
 import ColorModal from './components/modals/ColorModal';
+import MinigameLauncherModal from './components/modals/MinigameLauncherModal';
 import ImpostorSecretSheet from './components/game/ImpostorSecretSheet';
 import { useMatchSync } from './hooks/useMatchSync';
 import { useGameActions } from './hooks/useGameActions';
@@ -30,12 +31,21 @@ import {
   SCANNER_MODES,
   STATES,
 } from './lib/gameSelectors';
-import { getMinigameByTaskType } from './lib/taskMappings';
+import { getMinigameByTaskType, TASK_MINIGAME_BY_TYPE } from './lib/taskMappings';
 
 const AVAILABLE_COLORS = COLORS.map((color) => ({
   ...color,
   name: color.id.toUpperCase(),
 }));
+
+const CAMERA_PERMISSION_STATES = {
+  IDLE: 'idle',
+  GRANTED: 'granted',
+  DENIED: 'denied',
+  INSECURE: 'insecure',
+  UNSUPPORTED: 'unsupported',
+  ERROR: 'error',
+};
 
 function createPlayerId() {
   const persisted = localStorage.getItem('pId');
@@ -54,9 +64,15 @@ export default function App() {
   const [isKillModalOpen, setIsKillModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isImpostorSheetOpen, setIsImpostorSheetOpen] = useState(false);
+  const [isMinigameLauncherOpen, setIsMinigameLauncherOpen] = useState(false);
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannerMode, setScannerMode] = useState(SCANNER_MODES.TASK);
+  const [cameraPermissionState, setCameraPermissionState] = useState(
+    CAMERA_PERMISSION_STATES.IDLE,
+  );
+  const [cameraPermissionMessage, setCameraPermissionMessage] = useState('');
+  const [cameraPermissionPrompted, setCameraPermissionPrompted] = useState(false);
 
   const [pendingEmergencyConfirm, setPendingEmergencyConfirm] = useState(false);
   const [pendingEmergencyConfirmUntil, setPendingEmergencyConfirmUntil] = useState(0);
@@ -145,6 +161,17 @@ export default function App() {
     () => getTaskTypeCounts(visibleTasks),
     [visibleTasks],
   );
+  const minigameEntries = useMemo(
+    () =>
+      Object.entries(TASK_MINIGAME_BY_TYPE)
+        .map(([taskType, data]) => ({
+          taskType,
+          path: data.path,
+          legacyTaskId: data.legacyTaskId,
+        }))
+        .sort((a, b) => a.taskType.localeCompare(b.taskType)),
+    [],
+  );
 
   const playerById = useMemo(
     () => Object.fromEntries(players.map((player) => [player.id, player])),
@@ -179,6 +206,62 @@ export default function App() {
     setIsScannerOpen(false);
   }, []);
 
+  const requestLobbyCameraPermission = useCallback(async () => {
+    setCameraPermissionPrompted(true);
+
+    if (!window.isSecureContext) {
+      setCameraPermissionState(CAMERA_PERMISSION_STATES.INSECURE);
+      setCameraPermissionMessage(
+        'Camera requer HTTPS. Use start-with-tunnel.cmd para liberar no celular.',
+      );
+      return false;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraPermissionState(CAMERA_PERMISSION_STATES.UNSUPPORTED);
+      setCameraPermissionMessage(
+        'Este navegador nao suporta acesso a camera por getUserMedia.',
+      );
+      return false;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
+      stream.getTracks().forEach((track) => track.stop());
+      setCameraPermissionState(CAMERA_PERMISSION_STATES.GRANTED);
+      setCameraPermissionMessage(
+        'Permissao da camera concedida. Scanner pronto para uso.',
+      );
+      return true;
+    } catch (error) {
+      const errorName = error?.name || '';
+      if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
+        setCameraPermissionState(CAMERA_PERMISSION_STATES.DENIED);
+        setCameraPermissionMessage(
+          'Permissao da camera negada. Libere a camera no navegador e tente novamente.',
+        );
+        return false;
+      }
+
+      if (errorName === 'NotFoundError' || errorName === 'OverconstrainedError') {
+        setCameraPermissionState(CAMERA_PERMISSION_STATES.ERROR);
+        setCameraPermissionMessage(
+          'Nenhuma camera compativel foi encontrada neste dispositivo.',
+        );
+        return false;
+      }
+
+      setCameraPermissionState(CAMERA_PERMISSION_STATES.ERROR);
+      setCameraPermissionMessage(
+        'Nao foi possivel inicializar a camera. Verifique HTTPS e permissao.',
+      );
+      return false;
+    }
+  }, []);
+
   const handleEnterLobby = async () => {
     const normalized = nickname.trim().toUpperCase();
     if (normalized.length < 2) {
@@ -192,6 +275,9 @@ export default function App() {
       result?.code === 'PLAYER_ALREADY_JOINED' ||
       result?.code === 'PLAYER_REJOINED'
     ) {
+      setCameraPermissionPrompted(false);
+      setCameraPermissionState(CAMERA_PERMISSION_STATES.IDLE);
+      setCameraPermissionMessage('');
       setHasJoined(true);
       setNotice('');
       localStorage.setItem('pNickname', normalized);
@@ -408,6 +494,22 @@ export default function App() {
     isOpen: isScannerOpen && gameState === STATES.IN_GAME,
     onDecode: handleDecodedQr,
   });
+
+  useEffect(() => {
+    if (!hasJoined || gameState !== STATES.LOBBY || cameraPermissionPrompted) return undefined;
+    const timeoutId = setTimeout(() => {
+      void requestLobbyCameraPermission();
+    }, 0);
+    return () => clearTimeout(timeoutId);
+  }, [cameraPermissionPrompted, gameState, hasJoined, requestLobbyCameraPermission]);
+
+  useEffect(() => {
+    if (gameState === STATES.LOBBY) return undefined;
+    const timeoutId = setTimeout(() => {
+      setIsMinigameLauncherOpen(false);
+    }, 0);
+    return () => clearTimeout(timeoutId);
+  }, [gameState]);
 
   useEffect(() => {
     if (gameState === STATES.IN_GAME) return undefined;
@@ -634,8 +736,14 @@ export default function App() {
         everyoneReady={everyoneReady}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onOpenColor={() => setIsColorModalOpen(true)}
+        onOpenMinigames={() => setIsMinigameLauncherOpen(true)}
         onToggleReady={toggleReady}
         onStartGame={handleStartGame}
+        cameraPermissionState={cameraPermissionState}
+        cameraPermissionMessage={cameraPermissionMessage}
+        onRetryCameraPermission={() => {
+          void requestLobbyCameraPermission();
+        }}
         resolveColor={resolveColor}
       />
 
@@ -661,6 +769,14 @@ export default function App() {
         }}
         onClose={handleCloseColorModal}
       />
+
+      {gameState === STATES.LOBBY && isMinigameLauncherOpen && (
+        <MinigameLauncherModal
+          isOpen
+          onClose={() => setIsMinigameLauncherOpen(false)}
+          minigameEntries={minigameEntries}
+        />
+      )}
     </>
   );
 }
