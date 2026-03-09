@@ -13,6 +13,27 @@ export function useQrScanner({ isOpen, containerId = 'task-qr-reader', onDecode 
     setScanInFlight(false);
   }, []);
 
+  const buildScannerErrorMessage = useCallback((error) => {
+    if (!window.isSecureContext) {
+      return 'Camera bloqueada em HTTP. Use HTTPS (start-with-tunnel.cmd).';
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      return 'Este navegador nao suporta camera para leitura de QR.';
+    }
+
+    const errorName = error?.name || '';
+    if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
+      return 'Permissao da camera negada. Libere a camera no navegador.';
+    }
+
+    if (errorName === 'NotFoundError' || errorName === 'OverconstrainedError') {
+      return 'Nenhuma camera compativel foi encontrada para o scanner.';
+    }
+
+    return 'Nao foi possivel abrir camera. Verifique permissao e HTTPS.';
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return undefined;
 
@@ -53,6 +74,16 @@ export function useQrScanner({ isOpen, containerId = 'task-qr-reader', onDecode 
 
     const bootScanner = async () => {
       try {
+        if (!window.isSecureContext) {
+          setScannerError(buildScannerErrorMessage());
+          return;
+        }
+
+        if (!navigator.mediaDevices?.getUserMedia) {
+          setScannerError(buildScannerErrorMessage());
+          return;
+        }
+
         const { Html5Qrcode } = await import('html5-qrcode');
         if (disposed) return;
 
@@ -73,17 +104,21 @@ export function useQrScanner({ isOpen, containerId = 'task-qr-reader', onDecode 
             handleDecodedText,
             () => {},
           );
-        } catch {
-          await scannerInstance.start(
-            { facingMode: 'environment' },
-            config,
-            handleDecodedText,
-            () => {},
-          );
+        } catch (primaryStartError) {
+          try {
+            await scannerInstance.start(
+              { facingMode: 'environment' },
+              config,
+              handleDecodedText,
+              () => {},
+            );
+          } catch (fallbackStartError) {
+            throw fallbackStartError || primaryStartError;
+          }
         }
-      } catch {
+      } catch (error) {
         if (!disposed) {
-          setScannerError('Nao foi possivel abrir camera. Use HTTPS e permita camera.');
+          setScannerError(buildScannerErrorMessage(error));
         }
       }
     };
@@ -96,7 +131,7 @@ export function useQrScanner({ isOpen, containerId = 'task-qr-reader', onDecode 
       setScanInFlight(false);
       void stopScanner();
     };
-  }, [containerId, isOpen, onDecode]);
+  }, [buildScannerErrorMessage, containerId, isOpen, onDecode]);
 
   return {
     scannerError,
