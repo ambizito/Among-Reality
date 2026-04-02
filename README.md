@@ -9,8 +9,9 @@ Projeto de jogo local estilo Among Us para brincar com amigos, com lobby em temp
 
 ## Autoria
 
-- Desenvolvido por: `André Azevedo Ferreira Carvalho`
-- LinkedIn: `https://www.linkedin.com/in/andreazevedoferreira/`
+- Desenvolvido por: Andre Azevedo Ferreira Carvalho
+- LinkedIn: [andreazevedoferreira](https://www.linkedin.com/in/andreazevedoferreira/)
+- Este projeto faz parte do meu portfolio tecnico e representa meu trabalho em gameplay web, integracao mobile e arquitetura full stack.
 
 ## Visao Rapida
 

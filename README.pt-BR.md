@@ -9,8 +9,9 @@ Projeto de jogo local estilo Among Us para brincar com amigos, com lobby em temp
 
 ## Autoria
 
-- Desenvolvido por: `André Azevedo Ferreira Carvalho`
-- LinkedIn: `https://www.linkedin.com/in/andreazevedoferreira/`
+- Desenvolvido por: Andre Azevedo Ferreira Carvalho
+- LinkedIn: [andreazevedoferreira](https://www.linkedin.com/in/andreazevedoferreira/)
+- Este projeto faz parte do meu portfolio tecnico e representa meu trabalho em gameplay web, integracao mobile e arquitetura full stack.
 
 ## Visao Rapida
 
@@ -101,7 +102,7 @@ npm run dev
 
 ## Demonstracao Visual (imagens e video)
 
-Esta secao ja esta pronta para voce plugar as imagens dos minigames e depois o video da aplicacao.
+Esta secao reune as imagens dos minigames e a demo em video da versao PT-BR do projeto.
 
 Arquivos esperados:
 
@@ -116,16 +117,11 @@ Arquivos esperados:
 - `docs/media/minigames/navegacao.png`
 - `docs/media/minigames/escudo.png`
 - `docs/media/minigames/eletrica_ritmo.png`
-- `docs/media/video/demo-thumb.png`
+- `docs/media/video/Demoptbr.mp4`
 
-### Video da aplicacao (placeholder)
+### Video da aplicacao
 
-[![Assistir demo](docs/media/video/demo-thumb.png)](https://www.youtube.com/watch?v=SEU_VIDEO_ID)
-
-Quando publicar a demo:
-
-1. Troque `SEU_VIDEO_ID` pelo ID real do video.
-2. Salve a thumbnail em `docs/media/video/demo-thumb.png`.
+[Assistir demo em video (PT-BR)](docs/media/video/Demoptbr.mp4)
 
 ### Galeria de minigames (placeholders prontos)
 

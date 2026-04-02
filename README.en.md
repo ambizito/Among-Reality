@@ -9,8 +9,9 @@ Local multiplayer social deduction game inspired by Among Us, built for casual p
 
 ## Author
 
-- Developed by: `André Azevedo Ferreira Carvalho`
-- LinkedIn: `https://www.linkedin.com/in/andreazevedoferreira/`
+- Developed by: Andre Azevedo Ferreira Carvalho
+- LinkedIn: [andreazevedoferreira](https://www.linkedin.com/in/andreazevedoferreira/)
+- This project is part of my technical portfolio and showcases my work in web gameplay, mobile integration, and full-stack architecture.
 
 ## Quick Overview
 
@@ -297,4 +298,3 @@ npm run qrcode:generate
 - Task instances for duplicates.
 - Individual kill cooldown + global sabotage cooldown.
 - Decoupled minigame integration using iframe.
-
